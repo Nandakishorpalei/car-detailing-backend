@@ -5,7 +5,7 @@ const multer = require("multer");
 const { S3Client } = require("@aws-sdk/client-s3");
 const multerS3 = require("multer-s3");
 const authenticate = require("../middlewares/authenticate");
-const File = require("../model/fileModel");
+// const File = require("../model/fileModel");
 const User = require("../model/userModel");
 
 const s3 = new S3Client({
@@ -29,30 +29,52 @@ const upload = multer({
 
 // Define a Mongoose model for storing file information in MongoDB
 
-// API endpoint for file upload
-router.post("", authenticate, upload.single("file"), async (req, res) => {
+// API endpoint for file upload single upload
+// router.post("", authenticate, upload.single("file"), async (req, res) => {
+//   try {
+//     const { originalname } = req.file;
+//     const user = await User.findById(req.user?._id);
+
+//     if (!user) {
+//       return res.status(500).json({
+//         error: "user not found",
+//       });
+//     }
+
+//     const file = new File({
+//       filename: originalname,
+//       url: req.file.location,
+//       user: user._id,
+//     });
+//     await file.save();
+//     console.log("file:", file);
+//     return res.status(200).send({ success: true, file });
+//   } catch (e) {
+//     console.log(e);
+//     return res.status(500).json({
+//       error: e.message || "An error occurred while uploading the file",
+//     });
+//   }
+// });
+
+// multiple upload
+router.post("", authenticate, upload.array("files", 10), async (req, res) => {
   try {
-    const { originalname } = req.file;
     const user = await User.findById(req.user?._id);
 
     if (!user) {
-      return res.status(500).json({
-        error: "user not found",
-      });
+      return res.status(500).json({ error: "User not found" });
     }
 
-    const file = new File({
-      filename: originalname,
-      url: req.file.location,
-      user: user._id,
-    });
-    await file.save();
-    console.log("file:", file);
-    return res.status(200).send({ success: true, file });
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "No files uploaded" });
+    }
+
+    return res.status(200).json({ success: true, files: req.files });
   } catch (e) {
-    console.log(e);
+    console.error(e);
     return res.status(500).json({
-      error: e.message || "An error occurred while uploading the file",
+      error: e.message || "An error occurred while uploading files",
     });
   }
 });

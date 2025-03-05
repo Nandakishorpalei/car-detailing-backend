@@ -32,7 +32,7 @@ passport.use(
           firstName: profile?._json?.firstName || profile?._json?.given_name,
           lastName: profile?._json?.family_name,
           isMailVerified: true,
-        }).select("-phoneOtp -emailOtp -password");
+        });
       }
 
       const token = newToken(user);

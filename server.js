@@ -7,8 +7,8 @@ const session = require("express-session");
 
 app.use(
   cors({
-    origin: "http://localhost:3000", // Replace with your React app's URL
-    credentials: true, // Enable cookies and other credentials in CORS requests
+    origin: "http://127.0.0.1:3000",
+    credentials: true,
   })
 );
 
@@ -85,7 +85,16 @@ app.use("/files", fileController);
 const productController = require("./src/controllers/productController");
 app.use("/product", productController);
 
+const carController = require("./src/controllers/carController");
+app.use("/cars", carController);
+
+const serviceDetailsController = require("./src/controllers/serviceDetailsController");
+app.use("/services", serviceDetailsController);
+
 const addressController = require("./src/controllers/addressController");
 app.use("/address", addressController);
+
+const newsLetterSubscriberController = require("./src/controllers/newsLetterSubscriberController");
+app.use("/newsletter", newsLetterSubscriberController);
 
 module.exports = app;

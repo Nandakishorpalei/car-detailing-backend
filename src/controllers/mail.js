@@ -2,80 +2,96 @@ require("dotenv").config();
 const nodemailer = require("nodemailer");
 const generateVerificationCode = require("../utils/verificationCode");
 const { google } = require("googleapis");
-
 const User = require("../model/userModel");
 
 const OAuth2 = google.auth.OAuth2;
 
-// Replace with your OAuth 2.0 client credentials
+// OAuth2 client setup
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = "https://developers.google.com/oauthplayground"; // Must match your Google Cloud Console configuration
 
 const oAuth2Client = new OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-
-// Replace with your OAuth 2.0 refresh token
 oAuth2Client.setCredentials({ refresh_token: process.env.REFRESH_TOKEN });
 
+// Send Mail Handler
 const sendMail = async (req, res) => {
   try {
-    const accessToken = oAuth2Client.getAccessToken();
+    console.log("coming here 0", oAuth2Client)
+    // Await the access token
+    const googleToken = await oAuth2Client.getAccessToken();
+    console.log("coming here 1")
+    const token = googleToken.token;
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
         type: "OAuth2",
         user: process.env.MY_EMAIL,
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
         refreshToken: process.env.REFRESH_TOKEN,
-        accessToken: accessToken,
+        accessToken: token, // Use the refreshed access token
       },
       tls: {
         rejectUnauthorized: true,
       },
     });
 
-    // Generate and send verification email
-    // "upasanakuar44@gmail.com"
-    const userEmailAddress = "nandakishorpalei7676@gmail.com";
+    // Generate and send the verification email
+    const userEmailAddress = "nandakishorpalei7676@gmail.com";  // Recipient email
     const verificationCode = generateVerificationCode();
     const mailOptions = {
-      from: '"Nanda kishor palei" <nandakishorpalei7676@gmail.com>',
-      to: userEmailAddress, // list of recipients with commas
+      from: '"Nanda Kishor Palei" <nandakishorpalei7676@gmail.com>',
+      to: userEmailAddress, // List of recipients
       subject: "Please Verify Your Email Address 📧",
       html: `
-    <div style="background-color: #f5f5f5; padding: 20px; color: black; font-size: 18px;">
-      <p style="color: black;">Hello,</p>
-      <p style="color: black;">We're excited to welcome you to our community! To ensure the security of your account and grant you access to our services, we kindly ask you to verify your email address.</p>
-      <p style="color: black;">Please use the verification code below:</p>
-      <p>Verification Code: <b>${verificationCode}</b></p>
-      <p style="color: black;">If you didn't initiate this action, please ignore this email. Your account's safety is our priority.</p>
-      <p style="color: black;>"Thank you for joining us!</p>
-      <p style="color: black;"><em>The Nanda Kishor Palei Team</em></p>
-    </div>
-  `,
+        <div style="background-color: #f5f5f5; padding: 20px; color: black; font-size: 18px;">
+          <p>Hello,</p>
+          <p>We're excited to welcome you to our community! To ensure the security of your account and grant you access to our services, we kindly ask you to verify your email address.</p>
+          <p>Please use the verification code below:</p>
+          <p>Verification Code: <b>${verificationCode}</b></p>
+          <p>If you didn't initiate this action, please ignore this email. Your account's safety is our priority.</p>
+          <p>Thank you for joining us!</p>
+          <p><em>The Nanda Kishor Palei Team</em></p>
+        </div>
+      `,
     };
-
-    const emailInfo = await transporter.sendMail(mailOptions);
-    let user = await User.findOneAndUpdate(
+    console.log("coming here")
+    // Send the email and update the user with the OTP
+    await transporter.sendMail(mailOptions);
+    await User.findOneAndUpdate(
       { email: req.body.email },
       { emailOtp: verificationCode }
     );
+
+    // Respond with success message
     return res.status(200).send({
       success: true,
       message: `OTP sent to ${req.body.email} successfully.`,
     });
   } catch (e) {
+    console.error('Error sending mail:', e.message);
     return res.status(500).send({ success: false, message: e.message });
   }
 };
 
+// Verify Mail OTP
 const verifyMail = async (req, res) => {
   try {
     const { email, otp } = req.body;
     const user = await User.findOne({ email }).lean();
-    console.log(user.emailOtp, otp, user.emailOtp === otp);
-    if (user.emailOtp === otp) {
+    
+    if (!user) {
+      return res.status(400).send({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // Trim and compare OTPs to avoid issues with extra spaces
+    const isOtpValid = user.emailOtp && user.emailOtp.trim() === otp.trim();
+    
+    if (isOtpValid) {
       await User.findOneAndUpdate({ email }, { isMailVerified: true });
       return res.status(200).send({
         success: true,
@@ -89,7 +105,7 @@ const verifyMail = async (req, res) => {
       });
     }
   } catch (e) {
-    console.log(e.message);
+    console.error('Error verifying mail:', e.message);
     return res.status(500).send({
       success: false,
       message: e.message,
@@ -97,4 +113,5 @@ const verifyMail = async (req, res) => {
   }
 };
 
+// Export handlers
 module.exports = { sendMail, verifyMail };
